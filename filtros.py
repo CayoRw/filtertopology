@@ -15,7 +15,7 @@ from matplotlib.figure import Figure
 class Filtros(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("PID Control Interface")
+        self.setWindowTitle("Filter Interface")
         self.setup_ui()
 
     def setup_ui(self):
@@ -112,10 +112,12 @@ class Filtros(QMainWindow):
     def select_filter (self):
         am = self.am_input.text()
         wp = self.wp_input.text()
-        self.corte = float(wp)
-        self.corte = 2*np.pi*self.corte
+        self.cutoff = float(wp)
+        self.cutoff = 2*np.pi*self.cutoff
         amin = self.amin_input.text()
         ws = self.ws_input.text()
+        self.stopband = float(wp)
+        self.stopband = 2*np.pi*self.stopband
         if self.gain_input.isEnabled():
             gain_text = self.gain_input.text()
         else:
@@ -123,54 +125,44 @@ class Filtros(QMainWindow):
         self.gain_float = float(gain_text)
         filter = self.filter_type.currentText()
         if filter == 'Butterworth':
-            self.start_butterworth(am,wp,amin,ws,gain_text)
+            self.start_butterworth(am,wp,amin,ws)
         if filter == 'Chebyshev':
-            self.start_chebyshev(am,wp,amin,ws,gain_text)
+            self.start_chebyshev(am,wp,amin,ws)
 
-    def start_butterworth(self, am, wp, amin, ws, k):
-        k = float(k)
+    def start_butterworth(self, am, wp, amin, ws):
+        k = self.gain_float
         am = float(am)
         wp = 2*math.pi*float(wp)
         amin = float(amin)
         ws = 2*math.pi*float(ws)
         self.wp = wp
         self.ws = ws
-        #print(am,wp,amin,ws)
         ep = sqrt(10**(am/10)-1)
         self.ep = float(ep)
-        #print("ep = ", ep)
         n = math.log10((10**(amin/10)-1)/((ep)**2))/(2*math.log10(ws/wp))
         self.n = n
-        #print("n = ",n)
         nint = 0
         while nint <n:
             nint+=1
-        #print("nint = ",nint)
         w = wp*((1/ep)**(1/nint))
         self.polos = np.zeros(nint, dtype=complex)
         j = len(self.polos)-1
         if nint % 2 == 0:
             theta = math.pi/(2*nint)
-            #print("theta = ", theta*180/math.pi)
             theta2 = math.pi/nint
-            #print("thetha2 = ", theta2*180/math.pi)
             for i in range(0, nint//2):
                 theta3 = math.pi/2-(theta+theta2*i)
                 self.polos[i] = complex(w*-cos(theta3),w*sin(theta3))
                 self.polos[j-i] = complex(w*-cos(theta3),w*-sin(theta3))
         else:
             theta = math.pi/(2*nint)
-            #print("theta = ", theta*180/math.pi)
             theta2 = math.pi/nint
-            #print("thetha2 = ", theta2*180/math.pi)
             for i in range(0, nint//2):
-                #print('i = ',i,'; j-i = ',j-i)
                 theta3 = math.pi/2-(theta+theta2*i)
                 self.polos[i] = complex(w*-cos(theta3),w*sin(theta3))
                 self.polos[j-i] = complex(w*-cos(theta3),w*-sin(theta3))
             self.polos[nint//2] = complex(-w,0)
         self.show_ft_butteworth(k)
-        #print("polos = ",self.polos)
 
     def show_ft_butteworth(self,k):
         polos = self.polos
@@ -180,7 +172,6 @@ class Filtros(QMainWindow):
         else:
             kpart = k**(1/((j+1)//2))
         equation_parts = []
-        #print(kpart)
         for i in range(0, j//2):
             p1 = polos[i]
             w = abs(p1)
@@ -193,11 +184,9 @@ class Filtros(QMainWindow):
             num = kpart
             denom = f"s + {-p_extra.real:.2f}"
             equation_parts.append(rf"\frac{{{num}}}{{{denom:}}}")
-        #print(w)
         latex = " * ".join(equation_parts)
         latex = f"H(s) = {latex}"
         latex = f"${latex}$"
-        #print(latex)
         fig = Figure(figsize=(9, 3))
         ax = fig.add_subplot(111, facecolor='#404040')
         ax.text(0.5, 0.5,latex, fontsize=15, ha='center', va='center', color='white')
@@ -214,34 +203,27 @@ class Filtros(QMainWindow):
         self.bottom_frame.updateGeometry()
         self.bottom_frame.repaint()
 
-    def start_chebyshev(self, am, wp, amin, ws, gain):
+    def start_chebyshev(self, am, wp, amin, ws):
         am = float(am)
         wp = 2*math.pi*float(wp)
         amin = float(amin)
         ws = 2*math.pi*float(ws)
-        gain = float(gain)
-        self.wp = wp
-        self.ws = ws
+        gain = self.gain_float
         ep = sqrt(10**(am/10)-1)
         n = math.acosh(sqrt((10**(amin/10)-1)/ep**2)/math.acosh(ws/wp))
         self.n = n
         self.ep = float(ep)
-        #print("ep = ", ep)
-        #print("n = ",n)
         nint = 0
         while nint <n:
             nint+=1
-        #print("nint = ",nint)
         self.polos = np.zeros(nint, dtype=complex)
         for k in range(1,nint+1):
-           #print(k)
            a=math.sin(((2*k-1)/nint)*math.pi/2)
            b=math.sinh((1/nint)*math.asinh(1/ep))
            c=math.cos(((2*k-1)/nint)*math.pi/2)
            d=math.cosh((1/nint)*math.asinh(1/ep))
            self.polos[k-1] = complex(-wp*a*b,wp*c*d)
         self.show_ft_chebyshev(nint,ep,wp,gain)
-        #print(self.polos)
         
     def show_ft_chebyshev(self,n,ep,wp,k):
         polos = self.polos
@@ -253,12 +235,10 @@ class Filtros(QMainWindow):
             p1 = -polos[i]
             denom_parts.append(f" * (s + {p1:.2f}) ")
         denom_str = " ".join(denom_parts)
-
         equation_parts.append(rf"\frac{{{num:.2f}}}{{{denom_str}}}")
         latex = " * ".join(equation_parts)
         latex = f"H(s) = {latex}"
         latex = f"${latex}$"
-        #print(latex)
         fig = Figure(figsize=(9, 3))
         ax = fig.add_subplot(111, facecolor='#404040')
         ax.text(0.5, 0.5,latex, fontsize=15, ha='center', va='center', color='white')
@@ -276,24 +256,18 @@ class Filtros(QMainWindow):
         self.bottom_frame.repaint()
 
     def show_plan_s(self):
-        # Configurar o gráfico
         plt.figure(figsize=(8, 8))
-        plt.axhline(0, color='black', lw=0.5)  # Eixo x
-        plt.axvline(0, color='black', lw=0.5)  # Eixo y
-
+        plt.axhline(0, color='black', lw=0.5) 
+        plt.axvline(0, color='black', lw=0.5) 
         plt.scatter(self.polos.real, self.polos.imag, marker='x', color='red', label='Polos')
-
-        # Adicionar etiquetas e grade
         plt.xlabel('Parte Real')
         plt.ylabel('Parte Imaginária')
         plt.title('Diagrama de Polos')
         plt.legend()
         plt.grid(True)
-
         plt.show()
 
     def select_bode_diagram(self):
-
         filter = self.filter_type.currentText()
         if filter == 'Butterworth':
             self.show_bode_diagram_butterworth()
@@ -301,14 +275,11 @@ class Filtros(QMainWindow):
             self.show_bode_diagram_chebyshev()
 
     def show_bode_diagram_butterworth(self):
-        
         if not hasattr(self, 'ep') or not hasattr(self, 'wp') or not hasattr(self, 'n'):
             print("Os parâmetros necessários não estão definidos.")
             return
-        print('aqii:',self.corte)
-        a = int(np.log10(self.corte*0.0001))
-        b = int(np.log10(self.corte*100000))
-        print('a = ',a, ' b = ',b, ' freq de corte = ',int(np.log10(self.corte)))
+        a = int(np.log10(self.cutoff*0.0001))
+        b = int(np.log10(self.stopband*1000))
         w = np.logspace(a, b, 100)
         gaindb = 20*np.log10(self.gain_float)
         try:
@@ -318,9 +289,8 @@ class Filtros(QMainWindow):
             print(f"Erro no cálculo: {e}")
             return
         tjw_db = tjw_db + gaindb
-        #construindo o segundo diagrama de fase
+        #Phase Diagram:
         try:
-            j = len(self.polos)
             fiw = np.zeros_like(w)
             for polo in self.polos:
                 wp = abs(polo)
@@ -331,7 +301,6 @@ class Filtros(QMainWindow):
             print(f"Erro no cálculo da fase: {e}")
             return
 
-        # Plotar o diagrama de Bode (magnitude)
         plt.figure(figsize=(18, 8))
 
         plt.subplot(1,2,1)
@@ -355,10 +324,9 @@ class Filtros(QMainWindow):
         if not hasattr(self, 'ep') or not hasattr(self, 'wp') or not hasattr(self, 'n'):
             print("Os parâmetros necessários não estão definidos.")
             return
-        a = int(np.log(self.corte*0.00001))
-        b = int(np.log(self.corte*10))
-        print('a = ',a, ' b = ',b, ' freq de corte = ',int(np.log(self.corte)))
-        w = np.logspace(a, b, 100)
+        a = int(np.log(self.cutoff*0.0001))
+        b = int(np.log(self.stopband*1000))
+        w = np.logspace(a, b, 500)
         gaindb = 20*np.log10(self.gain_float)
         try:
             tjw = np.zeros_like(w)
@@ -372,7 +340,7 @@ class Filtros(QMainWindow):
             print(f"Erro no cálculo: {e}")
             return
         tjw_db = tjw_db + gaindb
-        #diagrama de fase
+        #Phase Diagram:
         try:
             j = len(self.polos)
             fiw = np.zeros_like(w)
@@ -384,11 +352,8 @@ class Filtros(QMainWindow):
         except Exception as e:
             print(f"Erro no cálculo da fase: {e}")
             return
-
-
-        # Plotar o diagrama de Bode (magnitude)
+        #Plot the bode diagram:
         plt.figure(figsize=(18, 8))
-
         plt.subplot(1,2,1)
         plt.semilogx(w, tjw_db)
         plt.xlabel('Frequência (rad/s)')
@@ -396,14 +361,12 @@ class Filtros(QMainWindow):
         plt.title('Diagrama de Bode - Magnitude')
         plt.grid(which='both', linestyle='--', linewidth=0.5)
         plt.show()
-
         plt.subplot(1,2,2)
         plt.semilogx(w, fiw_deg)
         plt.xlabel('Frequência (rad/s)')
         plt.ylabel('Fase (Graus)')
         plt.title('Diagrama de Fase')
         plt.grid(which='both', linestyle='--', linewidth=0.5)
-
         plt.tight_layout()
         plt.show()
 
@@ -448,11 +411,6 @@ class Filtros(QMainWindow):
         r2_text = f'; '.join(r2_parts)
         c1_text = f'; '.join(c1_parts)
         c2_text = f'; '.join(c2_parts)
-        '''
-        print (r1_text)
-        print (r2_text)
-        print (c1_text)
-        print (c2_text)'''
         topology = 'sallenkey'
         plot_window = PlotWindow()
         plot_window.writelabels(r1_text,r2_text,c1_text,c2_text,None,topology)
@@ -542,12 +500,10 @@ class PlotWindow(QDialog):
         self.setLayout(self.main_layout)
 
     def writelabels(self,r1,r2,c1,c2,r3,topology):
-
         self.label_r1.setText(f"R1: {r1} Ω ")
         self.label_r2.setText(f"R2: {r2} Ω ")
         self.label_c1.setText(f"C1: {c1} F ")
         self.label_c2.setText(f"C2: {c2} F ") 
-
         if topology == 'multiple_feedback':
             self.label_r3.setText(f"R3: {r3} Ω")
             self.label_r3.show()
