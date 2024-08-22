@@ -30,9 +30,9 @@ class Filtros(QMainWindow):
         self.left_frame = QFrame()
         self.left_layout = QVBoxLayout(self.left_frame)
         self.label1 = QLabel("Maximum variation in the passband: (Am)")
-        self.label2 = QLabel("Frequency that delimits the pass band: ωp")
+        self.label2 = QLabel("Frequency that delimits the pass band: ωp [Hz]")
         self.label3 = QLabel("Minimum attenuation in the rejection band: (Amin)")
-        self.label4 = QLabel("Frequency that delimits the rejection range: ωs")
+        self.label4 = QLabel("Frequency that delimits the rejection range: ωs [Hz]")
         self.label5 = QLabel("Filter type:")
         self.label6 = QLabel("Topology type:")
         self.label7 = QLabel("Gain (k): ")
@@ -112,12 +112,15 @@ class Filtros(QMainWindow):
     def select_filter (self):
         am = self.am_input.text()
         wp = self.wp_input.text()
+        self.corte = float(wp)
+        self.corte = 2*np.pi*self.corte
         amin = self.amin_input.text()
         ws = self.ws_input.text()
         if self.gain_input.isEnabled():
             gain_text = self.gain_input.text()
         else:
             gain_text = "1"
+        self.gain_float = float(gain_text)
         filter = self.filter_type.currentText()
         if filter == 'Butterworth':
             self.start_butterworth(am,wp,amin,ws,gain_text)
@@ -143,7 +146,7 @@ class Filtros(QMainWindow):
         while nint <n:
             nint+=1
         #print("nint = ",nint)
-        w = wp*2*math.pi*((1/ep)**(1/nint))
+        w = wp*((1/ep)**(1/nint))
         self.polos = np.zeros(nint, dtype=complex)
         j = len(self.polos)-1
         if nint % 2 == 0:
@@ -166,17 +169,18 @@ class Filtros(QMainWindow):
                 self.polos[i] = complex(w*-cos(theta3),w*sin(theta3))
                 self.polos[j-i] = complex(w*-cos(theta3),w*-sin(theta3))
             self.polos[nint//2] = complex(-w,0)
-        self.show_ft_butteworth(self.polos, k)
+        self.show_ft_butteworth(k)
         #print("polos = ",self.polos)
 
-    def show_ft_butteworth(self,polos,k):
-        self.polos = polos
+    def show_ft_butteworth(self,k):
+        polos = self.polos
         j = len(self.polos)
         if j%2==0:
             kpart = k**(1/(j//2))
         else:
             kpart = k**(1/((j+1)//2))
         equation_parts = []
+        #print(kpart)
         for i in range(0, j//2):
             p1 = polos[i]
             w = abs(p1)
@@ -189,7 +193,7 @@ class Filtros(QMainWindow):
             num = kpart
             denom = f"s + {-p_extra.real:.2f}"
             equation_parts.append(rf"\frac{{{num}}}{{{denom:}}}")
-
+        #print(w)
         latex = " * ".join(equation_parts)
         latex = f"H(s) = {latex}"
         latex = f"${latex}$"
@@ -230,14 +234,17 @@ class Filtros(QMainWindow):
         #print("nint = ",nint)
         self.polos = np.zeros(nint, dtype=complex)
         for k in range(1,nint+1):
-           a=math.sin(((2*k-1)/n)*math.pi/2)
-           b=math.sinh((1/n)*math.asinh(1/ep))
-           c=math.cos(((2*k-1)/n)*math.pi/2)
-           d=math.cosh((1/n)*math.asinh(1/ep))
+           #print(k)
+           a=math.sin(((2*k-1)/nint)*math.pi/2)
+           b=math.sinh((1/nint)*math.asinh(1/ep))
+           c=math.cos(((2*k-1)/nint)*math.pi/2)
+           d=math.cosh((1/nint)*math.asinh(1/ep))
            self.polos[k-1] = complex(-wp*a*b,wp*c*d)
-        self.show_ft_chebyshev(self.polos,n,ep,wp,gain)
+        self.show_ft_chebyshev(nint,ep,wp,gain)
+        #print(self.polos)
         
-    def show_ft_chebyshev(self,polos,n,ep,wp,k):
+    def show_ft_chebyshev(self,n,ep,wp,k):
+        polos = self.polos
         j = len(polos)
         equation_parts = []
         num = k * wp**n
@@ -269,7 +276,6 @@ class Filtros(QMainWindow):
         self.bottom_frame.repaint()
 
     def show_plan_s(self):
-
         # Configurar o gráfico
         plt.figure(figsize=(8, 8))
         plt.axhline(0, color='black', lw=0.5)  # Eixo x
@@ -299,15 +305,19 @@ class Filtros(QMainWindow):
         if not hasattr(self, 'ep') or not hasattr(self, 'wp') or not hasattr(self, 'n'):
             print("Os parâmetros necessários não estão definidos.")
             return
-
-        w = np.logspace(2, 10, 1000)
+        print('aqii:',self.corte)
+        a = int(np.log10(self.corte*0.0001))
+        b = int(np.log10(self.corte*100000))
+        print('a = ',a, ' b = ',b, ' freq de corte = ',int(np.log10(self.corte)))
+        w = np.logspace(a, b, 100)
+        gaindb = 20*np.log10(self.gain_float)
         try:
             tjw = 1 / np.sqrt(1 +(self.ep**2)*((w/self.wp)**(2*self.n)))
             tjw_db = 20 * np.log10(tjw)
         except Exception as e:
             print(f"Erro no cálculo: {e}")
             return
-
+        tjw_db = tjw_db + gaindb
         #construindo o segundo diagrama de fase
         try:
             j = len(self.polos)
@@ -316,7 +326,7 @@ class Filtros(QMainWindow):
                 wp = abs(polo)
                 fiw -= np.arctan(w/wp)
             fiw_deg = np.degrees(fiw)
-            fiw_deg = (fiw_deg + 180) % 360 - 180
+            #fiw_deg = (fiw_deg + 180) % 360 - 180
         except Exception as e:
             print(f"Erro no cálculo da fase: {e}")
             return
@@ -341,14 +351,15 @@ class Filtros(QMainWindow):
         plt.tight_layout()
         plt.show()
 
-
-
     def show_bode_diagram_chebyshev(self):
         if not hasattr(self, 'ep') or not hasattr(self, 'wp') or not hasattr(self, 'n'):
             print("Os parâmetros necessários não estão definidos.")
             return
-
-        w = np.logspace(-1, 6, 1000)
+        a = int(np.log(self.corte*0.00001))
+        b = int(np.log(self.corte*10))
+        print('a = ',a, ' b = ',b, ' freq de corte = ',int(np.log(self.corte)))
+        w = np.logspace(a, b, 100)
+        gaindb = 20*np.log10(self.gain_float)
         try:
             tjw = np.zeros_like(w)
             for i in range(len(w)):
@@ -360,7 +371,7 @@ class Filtros(QMainWindow):
         except Exception as e:
             print(f"Erro no cálculo: {e}")
             return
-
+        tjw_db = tjw_db + gaindb
         #diagrama de fase
         try:
             j = len(self.polos)
@@ -369,7 +380,7 @@ class Filtros(QMainWindow):
                 wp = abs(polo)
                 fiw -= np.arctan(w/wp)
             fiw_deg = np.degrees(fiw)
-            fiw_deg = (fiw_deg + 180) % 360 - 180
+            #fiw_deg = (fiw_deg + 180) % 360 - 180
         except Exception as e:
             print(f"Erro no cálculo da fase: {e}")
             return
@@ -471,13 +482,13 @@ class Filtros(QMainWindow):
             r3 = m*r2
             r1 = r2/kpart 
             c2 = n*c1 
-            r1_parts.append(f"{r1:.2f}; ")
-            r2_parts.append(f"{r2:.2f}; ")
-            r3_parts.append(f"{r3:.2f}; ")
-            c1_parts.append(f"{c1:.2e}; ")
-            c2_parts.append(f"{c2:.2e}; ")
-        if k%2==1:
-            p1 = -self.polos[k//2].real
+            r1_parts.append(f"{r1:.2f} ")
+            r2_parts.append(f"{r2:.2f} ")
+            r3_parts.append(f"{r3:.2f} ")
+            c1_parts.append(f"{c1:.2e} ")
+            c2_parts.append(f"{c2:.2e} ")
+        if l%2==1:
+            p1 = -self.polos[l//2].real
             c1 = 10*10**-9
             r1 = 1 / (c1*p1)
             r1_parts.append(f"{r1:.2f} ")
