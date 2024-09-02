@@ -123,6 +123,7 @@ class Filtros(QMainWindow):
         else:
             gain_text = "1"
         self.gain_float = float(gain_text)
+        print(self.gain_float)
         filter = self.filter_type.currentText()
         if filter == 'Butterworth':
             self.start_butterworth(am,wp,amin,ws)
@@ -209,6 +210,8 @@ class Filtros(QMainWindow):
         amin = float(amin)
         ws = 2*math.pi*float(ws)
         gain = self.gain_float
+        self.wp = wp
+        self.ws = ws
         ep = sqrt(10**(am/10)-1)
         n = math.acosh(sqrt((10**(amin/10)-1)/ep**2)/math.acosh(ws/wp))
         self.n = n
@@ -278,8 +281,8 @@ class Filtros(QMainWindow):
         if not hasattr(self, 'ep') or not hasattr(self, 'wp') or not hasattr(self, 'n'):
             print("Os parâmetros necessários não estão definidos.")
             return
-        a = int(np.log10(self.cutoff*0.0001))
-        b = int(np.log10(self.stopband*1000))
+        a = int(np.log10(self.cutoff*0.001))
+        b = int(np.log10(self.stopband*100))
         w = np.logspace(a, b, 100)
         gaindb = 20*np.log10(self.gain_float)
         try:
@@ -325,7 +328,7 @@ class Filtros(QMainWindow):
             print("Os parâmetros necessários não estão definidos.")
             return
         a = int(np.log(self.cutoff*0.0001))
-        b = int(np.log(self.stopband*1000))
+        b = int(np.log(self.stopband*100))
         w = np.logspace(a, b, 500)
         gaindb = 20*np.log10(self.gain_float)
         try:
@@ -392,7 +395,7 @@ class Filtros(QMainWindow):
             Q = 1/(2*ksi)
             n = 4*Q**2 + 1
             m1 = (-(2-n/Q**2)+sqrt((2-n/Q**2)**2-4))/2
-            m2 = (-(2-n/Q**2)-sqrt((2-n/Q**2)**2-4))/2
+            #m2 = (-(2-n/Q**2)-sqrt((2-n/Q**2)**2-4))/2
             c1 = 10*10**-9
             c2 = n*c1
             r2 = 1/(c1*w0*sqrt(m1*n))
@@ -427,9 +430,8 @@ class Filtros(QMainWindow):
         kpart = k**(1/(l//2))
         for i in range (0,l//2):
             p1 = self.polos[i].real
-            p2 = self.polos[i].imag
-            ksi = abs(p2)/abs(p1)
-            w0 = abs(self.polos[i])
+            w0 = abs(self.polos[i])       #alterei aqui, estava ksi = img / real
+            ksi = abs(p1)/abs(w0)
             c1 = 10*10**-9
             g = 1+kpart
             q = 1/(2*ksi)
