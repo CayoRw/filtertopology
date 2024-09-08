@@ -389,8 +389,8 @@ class Filtros(QMainWindow):
         c2_parts = []
         for i in range (0,k//2):
             p1 = self.polos[i].real
-            p2 = self.polos[i].imag
-            ksi= abs(p2)/abs(p1)
+            w0 = abs(self.polos[i])      
+            ksi = abs(p1)/abs(w0)
             w0 = abs(self.polos[i])
             Q = 1/(2*ksi)
             n = 4*Q**2 + 1
@@ -430,7 +430,7 @@ class Filtros(QMainWindow):
         kpart = k**(1/(l//2))
         for i in range (0,l//2):
             p1 = self.polos[i].real
-            w0 = abs(self.polos[i])       #alterei aqui, estava ksi = img / real
+            w0 = abs(self.polos[i])       
             ksi = abs(p1)/abs(w0)
             c1 = 10*10**-9
             g = 1+kpart
@@ -511,7 +511,7 @@ class PlotWindow(QDialog):
             self.label_r3.show()
         else:
             self.label_r3.hide()
-            
+
     def go_back(self):
         self.close()
 
