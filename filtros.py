@@ -403,7 +403,7 @@ class Filtros(QMainWindow):
             r1_parts.append(f"{r1:.2f} ")
             r2_parts.append(f"{r2:.2f} ")
             c1_parts.append(f"{c1:.2e} ")
-            c2_parts.append(f"{c2:.2e} ") 
+            c2_parts.append(f"{c2:.2e} ")
         if k%2==1:
             p1 = -self.polos[k//2].real
             c1 = 10*10**-9
@@ -435,7 +435,7 @@ class Filtros(QMainWindow):
             c1 = 10*10**-9
             g = 1+kpart
             q = 1/(2*ksi)
-            n = 4*g*q**2
+            n = 4*g*q**2 + 1
             a= (2/g)-(n/((g**2)*(q**2)))
             m = -a+sqrt((a**2)-4/g**2)
             r2 = 1/(w0*c1*sqrt(m*n))
